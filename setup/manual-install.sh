@@ -35,15 +35,19 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Configuration variables
-SSID="PiCaptivePortal"
-PASSWORD="raspberry"
+SSID="CheckThisOut"
+PASSWORD=""  # Empty = open network (no password)
 INTERFACE="wlan0"
 PORTAL_IP="10.3.141.1"
 DHCP_RANGE="10.3.141.50,10.3.141.150"
 
 echo "This will set up a captive portal with:"
 echo "  - SSID: $SSID"
-echo "  - Password: $PASSWORD"
+if [ -z "$PASSWORD" ]; then
+    echo "  - Password: (none - open network)"
+else
+    echo "  - Password: $PASSWORD"
+fi
 echo "  - Portal IP: $PORTAL_IP"
 echo ""
 read -p "Continue? (y/n) " -n 1 -r
@@ -91,18 +95,85 @@ echo ""
 # Stop services during configuration
 # WHY: Prevents conflicts while we modify configuration files
 echo "Stopping services temporarily for configuration..."
-systemctl stop hostapd dnsmasq nginx
+systemctl stop hostapd dnsmasq nginx 2>/dev/null || true
+systemctl stop wpa_supplicant 2>/dev/null || true
 
-# Configure static IP for wlan0
-# WHY: The access point needs a predictable, static IP address that clients
-#      can use as their gateway and DNS server.
-cat > /etc/dhcpcd.conf << EOF
+# Detect network manager (dhcpcd vs NetworkManager)
+# WHY: Raspberry Pi OS Bookworm uses NetworkManager instead of dhcpcd
+echo "Detecting network management system..."
+if systemctl is-active --quiet NetworkManager; then
+    echo "NetworkManager detected (Bookworm or later)"
+    
+    # Configure NetworkManager to ignore wlan0
+    # WHY: NetworkManager interferes with hostapd by trying to manage wlan0
+    echo "Configuring NetworkManager to ignore $INTERFACE..."
+    mkdir -p /etc/NetworkManager/conf.d
+    cat > /etc/NetworkManager/conf.d/wlan0-unmanaged.conf << EOF
+[keyfile]
+unmanaged-devices=interface-name:$INTERFACE
+EOF
+    
+    # Create systemd service to configure static IP at boot
+    # WHY: NetworkManager won't manage it, so we need to set the IP ourselves
+    echo "Creating systemd service for static IP configuration..."
+    cat > /etc/systemd/system/wlan0-static-ip.service << EOF
+[Unit]
+Description=Configure static IP for wlan0
+Before=hostapd.service
+After=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/ip addr flush dev $INTERFACE
+ExecStart=/usr/sbin/ip addr add ${PORTAL_IP}/24 dev $INTERFACE
+ExecStart=/usr/sbin/ip link set $INTERFACE up
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    systemctl daemon-reload
+    systemctl enable wlan0-static-ip.service
+    
+    # Apply configuration immediately
+    ip addr flush dev $INTERFACE 2>/dev/null || true
+    ip addr add ${PORTAL_IP}/24 dev $INTERFACE 2>/dev/null || true
+    ip link set $INTERFACE up
+    
+    # Restart NetworkManager to apply unmanaged configuration
+    systemctl restart NetworkManager
+    
+    echo "NetworkManager configured successfully."
+    
+elif systemctl list-unit-files | grep -q dhcpcd.service; then
+    echo "dhcpcd detected (older Raspberry Pi OS)"
+    
+    # Configure static IP for wlan0 using dhcpcd
+    # WHY: The access point needs a predictable, static IP address
+    cat > /etc/dhcpcd.conf << EOF
 # Static IP configuration for wlan0
 # This interface will serve as the gateway for all connected clients
 interface $INTERFACE
     static ip_address=${PORTAL_IP}/24
     nohook wpa_supplicant
 EOF
+    
+    systemctl restart dhcpcd
+    echo "dhcpcd configured successfully."
+else
+    echo "WARNING: No known network manager detected."
+    echo "Configuring static IP manually..."
+    ip addr flush dev $INTERFACE 2>/dev/null || true
+    ip addr add ${PORTAL_IP}/24 dev $INTERFACE
+    ip link set $INTERFACE up
+fi
+
+# Disable wpa_supplicant on wlan0
+# WHY: wpa_supplicant is for WiFi client mode, conflicts with hostapd (AP mode)
+systemctl disable wpa_supplicant 2>/dev/null || true
+
 echo "Network interface configured with static IP."
 
 echo ""
@@ -117,21 +188,38 @@ echo "               - Client association and handshakes"
 echo ""
 echo "Configuration:"
 echo "  SSID: $SSID"
-echo "  Password: $PASSWORD"
+if [ -z "$PASSWORD" ]; then
+    echo "  Password: (none - open network)"
+    echo "  Security: Open (no encryption)"
+else
+    echo "  Password: $PASSWORD"
+    echo "  Security: WPA2-PSK with CCMP encryption"
+fi
 echo "  Interface: $INTERFACE"
 echo "  Channel: 7 (2.4GHz band)"
-echo "  Security: WPA2-PSK with CCMP encryption"
 echo ""
 
 # Copy configuration template
 cp config/hostapd.conf /etc/hostapd/hostapd.conf
 
-# Update SSID and password in config
+# Update SSID and interface in config
 # WHY: We use sed to replace placeholders with actual values,
 #      making this script reusable with different settings.
 sed -i "s/SSID_PLACEHOLDER/$SSID/" /etc/hostapd/hostapd.conf
-sed -i "s/PASSWORD_PLACEHOLDER/$PASSWORD/" /etc/hostapd/hostapd.conf
 sed -i "s/INTERFACE_PLACEHOLDER/$INTERFACE/" /etc/hostapd/hostapd.conf
+
+# Configure security based on whether password is provided
+# WHY: Open networks (no password) require different configuration than WPA2
+if [ -z "$PASSWORD" ]; then
+    # Open network configuration (no password)
+    SECURITY_CONFIG="# Open network - no authentication required\nauth_algs=1"
+else
+    # WPA2 secured network configuration
+    SECURITY_CONFIG="# WPA2 secured network\nauth_algs=1\nwpa=2\nwpa_key_mgmt=WPA-PSK\nwpa_passphrase=$PASSWORD\nwpa_pairwise=CCMP\nrsn_pairwise=CCMP"
+fi
+
+# Replace security placeholder with actual configuration
+sed -i "s|# SECURITY_CONFIG_PLACEHOLDER|$SECURITY_CONFIG|" /etc/hostapd/hostapd.conf
 
 # Tell hostapd where to find config
 # WHY: The default hostapd configuration may not specify a config file location
@@ -283,7 +371,11 @@ echo "SUMMARY OF CONFIGURATION:"
 echo "-------------------------"
 echo "Network Settings:"
 echo "  - SSID: $SSID"
-echo "  - Password: $PASSWORD"
+if [ -z "$PASSWORD" ]; then
+    echo "  - Password: (none - open network)"
+else
+    echo "  - Password: $PASSWORD"
+fi
 echo "  - Portal IP: $PORTAL_IP"
 echo "  - DHCP Range: $DHCP_RANGE"
 echo ""
@@ -300,7 +392,11 @@ echo "   sudo reboot"
 echo ""
 echo "2. CONNECT a test device:"
 echo "   - Scan for WiFi network: $SSID"
-echo "   - Enter password: $PASSWORD"
+if [ -z "$PASSWORD" ]; then
+    echo "   - Connect directly (no password required)"
+else
+    echo "   - Enter password: $PASSWORD"
+fi
 echo "   - Wait for captive portal popup (should appear automatically)"
 echo ""
 echo "3. TEST the portal:"
@@ -328,8 +424,14 @@ echo "      (Should return $PORTAL_IP)"
 echo ""
 echo "SECURITY WARNING:"
 echo "-----------------"
-echo "IMPORTANT: Change the default WiFi password before production use!"
-echo "Edit /etc/hostapd/hostapd.conf and modify 'wpa_passphrase' line."
+if [ -z "$PASSWORD" ]; then
+    echo "IMPORTANT: This is an OPEN network (no password required)."
+    echo "Anyone within range can connect. For production use, consider adding WPA2."
+    echo "Edit /etc/hostapd/hostapd.conf to add password protection."
+else
+    echo "IMPORTANT: Change the default WiFi password before production use!"
+    echo "Edit /etc/hostapd/hostapd.conf and modify 'wpa_passphrase' line."
+fi
 echo "Then restart: sudo systemctl restart hostapd"
 echo ""
 echo "EDUCATIONAL RESOURCES:"

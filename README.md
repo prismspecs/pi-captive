@@ -21,9 +21,12 @@ This project teaches:
 - Ethernet connection for initial setup (optional but recommended)
 
 ### Software Requirements
-- Raspberry Pi OS Lite or Desktop (Bookworm or later)
+- Raspberry Pi OS Lite or Desktop (Bookworm or later recommended)
 - Internet connection for package installation during setup
 - SSH access or direct terminal access
+- **Note**: The installation script automatically detects and configures for both:
+  - **Bookworm (2023+)**: Uses NetworkManager
+  - **Bullseye and earlier**: Uses dhcpcd
 
 ### Knowledge Prerequisites
 Students should be familiar with:
@@ -90,9 +93,9 @@ nginx serves captive portal webpage
 - **Access Point IP**: 10.3.141.1
 - **Subnet**: 10.3.141.0/24
 - **DHCP Range**: 10.3.141.50 - 10.3.141.150 (100 addresses)
-- **SSID**: PiCaptivePortal (configurable)
+- **SSID**: CheckThisOut (configurable)
 - **WiFi Channel**: 7 (2.4GHz band)
-- **Security**: WPA2-PSK with CCMP encryption
+- **Security**: Open network by default (no password required, configurable to WPA2)
 
 ## Installation Methods
 
@@ -256,11 +259,12 @@ Located at: `setup/config/hostapd.conf`
 Key parameters:
 ```bash
 interface=wlan0          # Wireless interface to use
-ssid=PiCaptivePortal     # Network name users will see
+ssid=CheckThisOut        # Network name users will see
 hw_mode=g                # WiFi mode (g = 2.4GHz)
 channel=7                # WiFi channel (1-11 for 2.4GHz)
-wpa=2                    # WPA2 security
-wpa_passphrase=raspberry # WiFi password (CHANGE THIS)
+auth_algs=1              # Authentication algorithms (1=open)
+# Note: Default is open network (no password)
+# For WPA2: add wpa=2, wpa_key_mgmt=WPA-PSK, wpa_passphrase=YourPassword
 ```
 
 **Educational note**: The channel selection matters. Channels 1, 6, and 11 are non-overlapping in 2.4GHz band. Channel 7 is chosen as a compromise but may conflict with nearby networks.
@@ -322,10 +326,9 @@ Connected clients: 1
 ### Step 2: Connect a Test Device
 
 1. On a phone/laptop, scan for WiFi networks
-2. Connect to `PiCaptivePortal`
-3. Enter password: `raspberry`
-4. Wait for captive portal popup (should appear automatically)
-5. If no popup, open a browser and visit any HTTP website
+2. Connect to `CheckThisOut` (open network - no password required)
+3. Wait for captive portal popup (should appear automatically)
+4. If no popup, open a browser and visit any HTTP website
 
 ### Step 3: Verify DNS Redirection
 
@@ -341,9 +344,9 @@ nslookup any-domain-at-all.com
 
 Visit any HTTP website in a browser. You should see the captive portal page with:
 - Welcome message
-- Connection information cards
-- Interactive color scheme button
-- Statistics display button
+- Interactive chat feature where users can post messages
+- Messages are shared in real-time with all connected users
+- Optional name field for chat messages
 
 ## Troubleshooting Guide
 
@@ -451,8 +454,18 @@ Edit `setup/config/hostapd.conf` before installation, or `/etc/hostapd/hostapd.c
 # Change SSID
 ssid=YourNetworkName
 
-# Change password (8-63 characters)
+# Add password protection (open network by default)
+# To add WPA2 password (8-63 characters), add these lines:
+auth_algs=1
+wpa=2
+wpa_key_mgmt=WPA-PSK
 wpa_passphrase=YourStrongPassword
+wpa_pairwise=CCMP
+rsn_pairwise=CCMP
+
+# Remove password (make it open network)
+# Simply remove or comment out the wpa* lines above
+# Keep only: auth_algs=1
 
 # Change channel
 channel=1    # or 6, 11 for non-overlapping
@@ -473,20 +486,29 @@ The portal webapp is located in `webapp/` directory:
 
 - `index.html` - Main page structure
 - `styles/main.css` - All styling and animations
-- `scripts/app.js` - Interactive functionality
+- `scripts/app.js` - Interactive chat functionality
 
 To deploy changes:
 ```bash
-sudo cp -r webapp/* /var/www/html/
-sudo systemctl restart nginx
+cd ~/pi-captive
+chmod +x deploy-webapp.sh
+sudo ./deploy-webapp.sh
 ```
 
+**Current Features**:
+- **Interactive Chat**: Users can post messages with optional names
+- **Real-time Updates**: Messages poll every 2 seconds using localStorage
+- **Responsive Design**: Works on phones, tablets, and desktops
+- **Animated Particles**: Floating background elements
+
 **Customization ideas for students**:
-1. Add institution logo
-2. Change color schemes
-3. Add usage policy or terms of service
-4. Implement a login form (requires backend)
-5. Add analytics or usage tracking
+1. Add institution logo or branding
+2. Change color schemes (edit CSS variables)
+3. Add usage policy or terms of service page
+4. Implement message moderation
+5. Add emoji support to chat
+6. Create different chat rooms
+7. Add backend API for persistent storage
 
 ### Changing Network Range
 
@@ -542,10 +564,11 @@ Measure portal performance:
 
 ### Important Warnings
 
-1. **Default Passwords**: Change ALL default passwords:
-   - WiFi password in hostapd.conf
-   - RaspAP admin password (if using)
-   - Raspberry Pi user password
+1. **Open Network**: The default configuration is an **open network** with no password:
+   - Anyone within range can connect without authentication
+   - Suitable for public demonstrations and captive portal testing
+   - For production use, add WPA2 password protection in hostapd.conf
+   - Also change: RaspAP admin password (if using) and Raspberry Pi user password
 
 2. **No Encryption**: HTTP traffic is unencrypted
    - Portal operator can see all unencrypted traffic

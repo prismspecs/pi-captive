@@ -40,9 +40,11 @@ function init() {
  */
 function connectToBackend() {
     // Connect to backend server via nginx proxy
+    // Use polling first for Mac captive portal compatibility
     state.socket = io({
-        transports: ['websocket', 'polling'],
-        path: '/socket.io/'
+        transports: ['polling', 'websocket'],
+        path: '/socket.io/',
+        upgrade: true
     });
     
     state.socket.on('connect', () => {

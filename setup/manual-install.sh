@@ -34,6 +34,30 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Check if running on Raspberry Pi
+# WHY: This script is designed for Raspberry Pi hardware and should not be run
+#      on regular desktop/laptop computers
+if ! grep -q "Raspberry Pi" /proc/cpuinfo 2>/dev/null && ! grep -q "BCM" /proc/cpuinfo 2>/dev/null; then
+    echo ""
+    echo "⚠️  WARNING: This does not appear to be a Raspberry Pi!"
+    echo ""
+    echo "This script will configure your system as a WiFi access point."
+    echo "It will modify network settings and install services."
+    echo ""
+    echo "Detected system: $(uname -m)"
+    if [ -f /etc/os-release ]; then
+        source /etc/os-release
+        echo "OS: $PRETTY_NAME"
+    fi
+    echo ""
+    read -p "Are you SURE you want to continue? (type 'yes' to proceed) " -r
+    echo
+    if [[ ! $REPLY == "yes" ]]; then
+        echo "Installation cancelled. Good choice!"
+        exit 1
+    fi
+fi
+
 # Configuration variables
 SSID="CheckThisOut"
 PASSWORD=""  # Empty = open network (no password)

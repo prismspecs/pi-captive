@@ -12,23 +12,21 @@
     
     <main class="container">
         <div class="card">
-            <div class="logo-area">
-                <div class="logo-circle">
-                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="2"/>
-                        <path d="M 30 50 Q 50 30, 70 50 T 110 50" fill="none" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                </div>
+            <div class="header-area">
                 <h1>Welcome to the Portal</h1>
+                <p class="subtitle">hacking as practice</p>
             </div>
             
             <div class="content">
-                <p class="subtitle">You're connected to a demonstration WiFi network</p>
+                <!-- Tab Navigation -->
+                <div class="tab-nav">
+                    <button class="tab-btn active" data-tab="chat">chat</button>
+                    <button class="tab-btn" data-tab="noise">noise</button>
+                    <button class="tab-btn" data-tab="draw">draw</button>
+                </div>
                 
-                <div class="chat-section">
-                    <h2>Interactive Chat</h2>
-                    <p>Leave a message for others to see:</p>
-                    
+                <!-- Chat Tab -->
+                <div class="tab-content active" id="chat-tab">
                     <div class="chat-messages" id="chatMessages">
                         <div class="chat-placeholder">No messages yet. Be the first to say hello!</div>
                     </div>
@@ -37,21 +35,41 @@
                         <input 
                             type="text" 
                             id="nameInput" 
-                            placeholder="Your name (optional)" 
+                            placeholder="name (optional)" 
                             maxlength="20"
                         />
                         <input 
                             type="text" 
                             id="messageInput" 
-                            placeholder="Type your message..." 
+                            placeholder="type message..." 
                             maxlength="200"
                         />
-                        <button id="sendBtn" class="btn btn-primary">Send</button>
+                        <button id="sendBtn" class="btn">send</button>
+                    </div>
+                </div>
+                
+                <!-- Noise Tab -->
+                <div class="tab-content" id="noise-tab">
+                    <div class="noise-controls">
+                        <button id="recordBtn" class="btn">● record</button>
+                        <button id="stopBtn" class="btn" disabled>■ stop</button>
+                        <span id="recordingStatus"></span>
                     </div>
                     
-                    <div class="chat-info">
-                        <small>Messages are shared with everyone on this network</small>
+                    <div class="noise-list" id="noiseList">
+                        <div class="noise-placeholder">No sounds yet. Record something!</div>
                     </div>
+                </div>
+                
+                <!-- Draw Tab -->
+                <div class="tab-content" id="draw-tab">
+                    <div class="draw-controls">
+                        <input type="color" id="colorPicker" value="#00ff00">
+                        <input type="range" id="brushSize" min="1" max="20" value="3">
+                        <button id="clearCanvas" class="btn">clear</button>
+                    </div>
+                    
+                    <canvas id="drawCanvas" width="600" height="400"></canvas>
                 </div>
                 
                 <div class="footer-info">

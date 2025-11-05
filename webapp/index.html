@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Welcome Portal</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div class="background-gradient"></div>
+    
+    <main class="container">
+        <div class="card">
+            <div class="logo-area">
+                <div class="logo-circle">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="2"/>
+                        <path d="M 30 50 Q 50 30, 70 50 T 110 50" fill="none" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                </div>
+                <h1>Welcome to the Portal</h1>
+            </div>
+            
+            <div class="content">
+                <p class="subtitle">You're connected to a demonstration WiFi network</p>
+                
+                <div class="info-grid">
+                    <div class="info-card">
+                        <div class="icon-svg">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                            </svg>
+                        </div>
+                        <h3>Connected</h3>
+                        <p>Your device is online</p>
+                    </div>
+                    
+                    <div class="info-card">
+                        <div class="icon-svg">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                            </svg>
+                        </div>
+                        <h3>Fast & Local</h3>
+                        <p>Served from Raspberry Pi</p>
+                    </div>
+                    
+                    <div class="info-card">
+                        <div class="icon-svg">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                            </svg>
+                        </div>
+                        <h3>Protected</h3>
+                        <p>WPA2-PSK encryption</p>
+                    </div>
+                </div>
+                
+                <div class="demo-section">
+                    <h2>Interactive Demo</h2>
+                    <p>Click below to see real-time interaction:</p>
+                    
+                    <div class="button-group">
+                        <button id="colorBtn" class="btn btn-primary">Change Colors</button>
+                        <button id="statsBtn" class="btn btn-secondary">Show Stats</button>
+                    </div>
+                    
+                    <div id="statsDisplay" class="stats-display hidden">
+                        <h3>Connection Info</h3>
+                        <ul id="statsList"></ul>
+                    </div>
+                </div>
+                
+                <div class="footer-info">
+                    <p class="timestamp">Connected at: <span id="connectionTime"></span></p>
+                    <p class="small-text">This is a captive portal demonstration running on Raspberry Pi 5</p>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <div class="particles" id="particles"></div>
+    
+    <script type="module" src="scripts/app.js"></script>
+</body>
+</html>
+

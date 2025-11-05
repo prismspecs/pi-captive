@@ -1,0 +1,61 @@
+# nginx configuration for captive portal
+# This serves the portal webpage and handles all HTTP requests
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    
+    # Catch all server names
+    server_name _;
+    
+    # Document root
+    root /var/www/html;
+    index index.html index.htm;
+    
+    # Disable caching for captive portal
+    add_header Cache-Control "no-cache, no-store, must-revalidate";
+    add_header Pragma "no-cache";
+    add_header Expires "0";
+    
+    # Main location block
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    
+    # Handle captive portal detection requests
+    # Android
+    location /generate_204 {
+        return 302 http://$host/index.html;
+    }
+    
+    # iOS/macOS
+    location /hotspot-detect.html {
+        return 302 http://$host/index.html;
+    }
+    
+    # Windows
+    location /connecttest.txt {
+        return 302 http://$host/index.html;
+    }
+    
+    # Firefox
+    location /success.txt {
+        return 302 http://$host/index.html;
+    }
+    
+    # Logging
+    access_log /var/log/nginx/captive-portal-access.log;
+    error_log /var/log/nginx/captive-portal-error.log;
+    
+    # Increase timeout for long-lived connections
+    keepalive_timeout 65;
+    
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript 
+               application/x-javascript application/javascript 
+               application/xml+rss application/json;
+}
+

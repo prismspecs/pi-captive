@@ -43,9 +43,10 @@ function init() {
  * BACKEND CONNECTION - Socket.io
  */
 function connectToBackend() {
-    // Connect to backend server on same host, port 3000
-    state.socket = io(':3000', {
-        transports: ['websocket', 'polling']
+    // Connect to backend server via nginx proxy
+    state.socket = io({
+        transports: ['websocket', 'polling'],
+        path: '/socket.io/'
     });
     
     state.socket.on('connect', () => {

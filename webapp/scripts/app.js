@@ -1,28 +1,21 @@
 /**
  * Captive Portal - Retro Hacking Interface
- * Features: Chat, Noise Recording, Shared Drawing Canvas
+ * Features: Real-time Chat, Noise Recording, Shared Drawing Canvas
+ * Backend: Socket.io for shared state across all connected devices
  */
-
-// Storage keys
-const STORAGE_KEYS = {
-    chat: 'portal_chat_messages',
-    noise: 'portal_noise_sounds',
-    canvas: 'portal_canvas_data'
-};
 
 // State management
 const state = {
     connectionTime: new Date(),
     particleCount: 15,
-    lastMessageCount: 0,
-    lastNoiseCount: 0,
     recording: false,
     mediaRecorder: null,
     audioChunks: [],
     drawing: false,
     canvas: null,
     ctx: null,
-    lastCanvasData: null
+    socket: null,
+    connected: false
 };
 
 // Initialize when DOM is ready
@@ -41,9 +34,68 @@ function init() {
     setupChat();
     setupNoise();
     setupCanvas();
-    startPolling();
+    connectToBackend();
     
     console.log('%c[PORTAL] Ready', 'color: #00ff00; font-weight: bold');
+}
+
+/**
+ * BACKEND CONNECTION - Socket.io
+ */
+function connectToBackend() {
+    // Connect to backend server on same host, port 3000
+    state.socket = io(':3000', {
+        transports: ['websocket', 'polling']
+    });
+    
+    state.socket.on('connect', () => {
+        console.log('%c[SOCKET] Connected to backend', 'color: #00ff00');
+        state.connected = true;
+        showNotification('connected to server');
+    });
+    
+    state.socket.on('disconnect', () => {
+        console.log('%c[SOCKET] Disconnected from backend', 'color: #ff0000');
+        state.connected = false;
+        showNotification('disconnected from server');
+    });
+    
+    // Initialize with current state
+    state.socket.on('init', (data) => {
+        console.log('[SOCKET] Received initial state:', data);
+        renderAllChatMessages(data.messages || []);
+        renderNoise(data.sounds || []);
+        if (data.canvasData) {
+            loadCanvasData(data.canvasData);
+        }
+    });
+    
+    // Real-time chat messages
+    state.socket.on('chat:message', (message) => {
+        appendChatMessage(message);
+    });
+    
+    // Real-time noise updates
+    state.socket.on('noise:add', (sound) => {
+        appendNoiseItem(sound);
+    });
+    
+    // Real-time canvas updates
+    state.socket.on('canvas:update', (data) => {
+        if (!state.drawing && data) {
+            loadCanvasData(data);
+        }
+    });
+    
+    state.socket.on('canvas:clear', () => {
+        if (state.ctx) {
+            state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+        }
+    });
+    
+    state.socket.on('connect_error', (error) => {
+        console.error('[SOCKET] Connection error:', error);
+    });
 }
 
 /**
@@ -94,19 +146,17 @@ function setupTabs() {
 }
 
 function switchTab(tabName) {
-    // Update buttons
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tabName);
     });
     
-    // Update content
     document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.toggle('active', content.id === `${tabName}-tab`);
     });
 }
 
 /**
- * CHAT SYSTEM - Fixed to prevent refresh flicker
+ * CHAT SYSTEM - Real-time with Socket.io
  */
 function setupChat() {
     const sendBtn = document.getElementById('sendBtn');
@@ -118,11 +168,14 @@ function setupChat() {
             if (e.key === 'Enter') sendMessage();
         });
     }
-    
-    loadChat();
 }
 
 function sendMessage() {
+    if (!state.connected) {
+        showNotification('not connected to server');
+        return;
+    }
+    
     const nameInput = document.getElementById('nameInput');
     const messageInput = document.getElementById('messageInput');
     
@@ -135,46 +188,11 @@ function sendMessage() {
         timestamp: new Date().toISOString()
     };
     
-    // Get existing messages
-    let messages = [];
-    try {
-        messages = JSON.parse(localStorage.getItem(STORAGE_KEYS.chat) || '[]');
-    } catch (e) {
-        console.error('Error loading messages:', e);
-    }
-    
-    messages.push(message);
-    
-    // Keep last 50 messages
-    if (messages.length > 50) {
-        messages = messages.slice(-50);
-    }
-    
-    // Save
-    try {
-        localStorage.setItem(STORAGE_KEYS.chat, JSON.stringify(messages));
-    } catch (e) {
-        console.error('Error saving message:', e);
-    }
-    
-    // Update display - append only the new message
-    appendChatMessage(message);
-    
-    // Update state
-    state.lastMessageCount = messages.length;
+    // Send to backend
+    state.socket.emit('chat:message', message);
     
     // Clear input
     if (messageInput) messageInput.value = '';
-}
-
-function loadChat() {
-    try {
-        const messages = JSON.parse(localStorage.getItem(STORAGE_KEYS.chat) || '[]');
-        state.lastMessageCount = messages.length;
-        renderAllChatMessages(messages);
-    } catch (e) {
-        console.error('Error loading chat:', e);
-    }
 }
 
 function renderAllChatMessages(messages) {
@@ -199,15 +217,12 @@ function appendChatMessage(message) {
     const container = document.getElementById('chatMessages');
     if (!container) return;
     
-    // Remove placeholder if present
     const placeholder = container.querySelector('.chat-placeholder');
     if (placeholder) placeholder.remove();
     
-    // Add new message
     const el = createChatMessageElement(message);
     container.appendChild(el);
     
-    // Keep only last 20 visible
     while (container.children.length > 20) {
         container.removeChild(container.firstChild);
     }
@@ -245,8 +260,6 @@ function setupNoise() {
     
     if (recordBtn) recordBtn.addEventListener('click', startRecording);
     if (stopBtn) stopBtn.addEventListener('click', stopRecording);
-    
-    loadNoise();
 }
 
 async function startRecording() {
@@ -269,7 +282,7 @@ async function startRecording() {
         document.getElementById('recordingStatus').textContent = 'recording...';
     } catch (e) {
         console.error('Error starting recording:', e);
-        showNotification('Microphone access denied');
+        showNotification('microphone access denied');
     }
 }
 
@@ -278,7 +291,6 @@ function stopRecording() {
         state.mediaRecorder.stop();
         state.recording = false;
         
-        // Stop all tracks
         state.mediaRecorder.stream.getTracks().forEach(track => track.stop());
         
         document.getElementById('recordBtn').disabled = false;
@@ -288,11 +300,22 @@ function stopRecording() {
 }
 
 function saveRecording() {
+    if (!state.connected) {
+        showNotification('not connected to server');
+        return;
+    }
+    
     const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
     const reader = new FileReader();
     
     reader.onloadend = () => {
         const base64 = reader.result;
+        
+        // Check size (limit to 1MB)
+        if (base64.length > 1000000) {
+            showNotification('recording too large');
+            return;
+        }
         
         const sound = {
             id: Date.now(),
@@ -301,44 +324,12 @@ function saveRecording() {
             timestamp: new Date().toISOString()
         };
         
-        // Load existing
-        let sounds = [];
-        try {
-            sounds = JSON.parse(localStorage.getItem(STORAGE_KEYS.noise) || '[]');
-        } catch (e) {
-            console.error('Error loading sounds:', e);
-        }
-        
-        sounds.push(sound);
-        
-        // Keep last 20
-        if (sounds.length > 20) {
-            sounds = sounds.slice(-20);
-        }
-        
-        // Save
-        try {
-            localStorage.setItem(STORAGE_KEYS.noise, JSON.stringify(sounds));
-            state.lastNoiseCount = sounds.length;
-            renderNoise(sounds);
-            showNotification('sound saved');
-        } catch (e) {
-            console.error('Error saving sound:', e);
-            showNotification('error: storage full');
-        }
+        // Send to backend
+        state.socket.emit('noise:add', sound);
+        showNotification('sound saved');
     };
     
     reader.readAsDataURL(blob);
-}
-
-function loadNoise() {
-    try {
-        const sounds = JSON.parse(localStorage.getItem(STORAGE_KEYS.noise) || '[]');
-        state.lastNoiseCount = sounds.length;
-        renderNoise(sounds);
-    } catch (e) {
-        console.error('Error loading noise:', e);
-    }
 }
 
 function renderNoise(sounds) {
@@ -355,6 +346,17 @@ function renderNoise(sounds) {
         const el = createNoiseElement(sound);
         container.appendChild(el);
     });
+}
+
+function appendNoiseItem(sound) {
+    const container = document.getElementById('noiseList');
+    if (!container) return;
+    
+    const placeholder = container.querySelector('.noise-placeholder');
+    if (placeholder) placeholder.remove();
+    
+    const el = createNoiseElement(sound);
+    container.appendChild(el);
 }
 
 function createNoiseElement(sound) {
@@ -397,12 +399,8 @@ function setupCanvas() {
     
     state.ctx = state.canvas.getContext('2d');
     
-    // Set actual canvas size
     state.canvas.width = 600;
     state.canvas.height = 400;
-    
-    // Load saved canvas
-    loadCanvas();
     
     // Drawing events
     state.canvas.addEventListener('mousedown', startDrawing);
@@ -474,82 +472,46 @@ function draw(e) {
 function stopDrawing() {
     if (state.drawing) {
         state.drawing = false;
-        saveCanvas();
+        broadcastCanvas();
     }
 }
 
 function clearCanvas() {
+    if (!state.connected) {
+        showNotification('not connected to server');
+        return;
+    }
+    
     if (state.ctx) {
         state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
-        saveCanvas();
+        state.socket.emit('canvas:clear');
     }
 }
 
-function saveCanvas() {
-    if (!state.canvas) return;
+function broadcastCanvas() {
+    if (!state.canvas || !state.connected) return;
+    
     try {
         const data = state.canvas.toDataURL();
-        localStorage.setItem(STORAGE_KEYS.canvas, data);
+        state.socket.emit('canvas:update', data);
     } catch (e) {
-        console.error('Error saving canvas:', e);
+        console.error('Error broadcasting canvas:', e);
     }
 }
 
-function loadCanvas() {
+function loadCanvasData(data) {
     if (!state.canvas || !state.ctx) return;
+    
     try {
-        const data = localStorage.getItem(STORAGE_KEYS.canvas);
-        if (data) {
-            const img = new Image();
-            img.onload = () => {
-                state.ctx.drawImage(img, 0, 0);
-                state.lastCanvasData = data;
-            };
-            img.src = data;
-        }
+        const img = new Image();
+        img.onload = () => {
+            state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+            state.ctx.drawImage(img, 0, 0);
+        };
+        img.src = data;
     } catch (e) {
         console.error('Error loading canvas:', e);
     }
-}
-
-/**
- * POLLING - Check for updates from other users
- */
-function startPolling() {
-    setInterval(() => {
-        try {
-            // Check for new chat messages
-            const messages = JSON.parse(localStorage.getItem(STORAGE_KEYS.chat) || '[]');
-            if (messages.length > state.lastMessageCount) {
-                const newMessages = messages.slice(state.lastMessageCount);
-                newMessages.forEach(msg => appendChatMessage(msg));
-                state.lastMessageCount = messages.length;
-            }
-            
-            // Check for new noise
-            const sounds = JSON.parse(localStorage.getItem(STORAGE_KEYS.noise) || '[]');
-            if (sounds.length !== state.lastNoiseCount) {
-                state.lastNoiseCount = sounds.length;
-                renderNoise(sounds);
-            }
-            
-            // Check for canvas updates
-            const canvasData = localStorage.getItem(STORAGE_KEYS.canvas);
-            if (canvasData && canvasData !== state.lastCanvasData) {
-                state.lastCanvasData = canvasData;
-                const img = new Image();
-                img.onload = () => {
-                    if (state.ctx && !state.drawing) {
-                        state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
-                        state.ctx.drawImage(img, 0, 0);
-                    }
-                };
-                img.src = canvasData;
-            }
-        } catch (e) {
-            console.error('Polling error:', e);
-        }
-    }, 2000);
 }
 
 /**

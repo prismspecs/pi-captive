@@ -97,42 +97,22 @@ nginx serves captive portal webpage
 - **WiFi Channel**: 7 (2.4GHz band)
 - **Security**: Open network by default (no password required, configurable to WPA2)
 
-## Installation Methods
+## Installation
 
-This project provides two installation approaches. Choose based on your learning objectives:
+This project uses a single automated installation script that handles all configuration:
 
-### Method 1: Manual Installation (Recommended for Learning)
-
-**When to use**: Educational environments, understanding each component, production deployments
-
-**Advantages**:
+**Features**:
 - Complete control over each configuration file
-- Understand how each service works
+- Automatic detection of OS version (Bookworm/Bullseye)
+- Configures NetworkManager or dhcpcd as appropriate
 - Easy to troubleshoot and modify
-- Better for learning networking concepts
+- Perfect for learning networking concepts
 
 **Time required**: 30-45 minutes
 
-### Method 2: RaspAP Installation (Quick Setup)
-
-**When to use**: Quick demonstrations, prototyping, non-technical users
-
-**Advantages**:
-- Fast installation (15 minutes)
-- Web-based configuration interface
-- All components pre-configured
-- Good for testing the concept quickly
-
-**Time required**: 15 minutes
-
-**Limitations**:
-- Less visibility into configuration
-- Harder to understand individual components
-- Web interface adds complexity
-
 ## Step-by-Step Installation
 
-### Preparation (All Methods)
+### Preparation
 
 1. **Flash Raspberry Pi OS to SD card**
    ```bash
@@ -160,9 +140,9 @@ This project provides two installation approaches. Choose based on your learning
    cd pi-captive
    ```
 
-### Method 1: Manual Installation (Step-by-Step)
+### Running the Installation Script
 
-The manual installation script performs these steps:
+The installation script performs these steps:
 
 ```bash
 cd setup
@@ -216,39 +196,6 @@ sudo bash manual-install.sh
 - Enables services to start on boot
 - Starts all services
 - *Why*: Portal must survive reboots
-
-### Method 2: RaspAP Installation
-
-```bash
-cd setup
-sudo bash raspap-install.sh
-```
-
-**Post-installation configuration**:
-
-1. Reboot the Raspberry Pi:
-   ```bash
-   sudo reboot
-   ```
-
-2. Connect to the WiFi network `raspi-webgui`
-   - Password: `ChangeMe`
-
-3. Access the web interface:
-   - URL: `http://10.3.141.1`
-   - Username: `admin`
-   - Password: `secret`
-
-4. Enable captive portal:
-   - Navigate to: Hotspot > Captive Portal
-   - Enable the captive portal feature
-   - Configure as needed
-
-5. Deploy custom webapp (optional):
-   ```bash
-   sudo cp -r webapp/* /var/www/html/
-   sudo systemctl restart nginx
-   ```
 
 ## Configuration Files Explained
 
@@ -568,7 +515,7 @@ Measure portal performance:
    - Anyone within range can connect without authentication
    - Suitable for public demonstrations and captive portal testing
    - For production use, add WPA2 password protection in hostapd.conf
-   - Also change: RaspAP admin password (if using) and Raspberry Pi user password
+   - Also change the default Raspberry Pi user password
 
 2. **No Encryption**: HTTP traffic is unencrypted
    - Portal operator can see all unencrypted traffic

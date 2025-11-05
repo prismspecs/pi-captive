@@ -386,24 +386,20 @@ h1 {
 }
 
 /* Custom scrollbar - retro green */
-.chat-messages::-webkit-scrollbar,
-.noise-list::-webkit-scrollbar {
+.chat-messages::-webkit-scrollbar {
     width: 8px;
 }
 
-.chat-messages::-webkit-scrollbar-track,
-.noise-list::-webkit-scrollbar-track {
+.chat-messages::-webkit-scrollbar-track {
     background: rgba(0, 0, 0, 0.5);
 }
 
-.chat-messages::-webkit-scrollbar-thumb,
-.noise-list::-webkit-scrollbar-thumb {
+.chat-messages::-webkit-scrollbar-thumb {
     background: var(--primary-color);
     border: 1px solid var(--primary-color);
 }
 
-.chat-messages::-webkit-scrollbar-thumb:hover,
-.noise-list::-webkit-scrollbar-thumb:hover {
+.chat-messages::-webkit-scrollbar-thumb:hover {
     background: var(--primary-hover);
 }
 
@@ -440,73 +436,6 @@ h1 {
 .btn:disabled {
     opacity: 0.3;
     cursor: not-allowed;
-}
-
-/* Noise Section */
-.noise-controls {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 15px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-#recordingStatus {
-    color: var(--secondary-color);
-    font-size: 0.85rem;
-    margin-left: 10px;
-}
-
-.noise-list {
-    background: rgba(0, 0, 0, 0.5);
-    border: 1px solid var(--primary-color);
-    padding: 15px;
-    max-height: 350px;
-    overflow-y: auto;
-}
-
-.noise-placeholder {
-    text-align: center;
-    color: var(--text-secondary);
-    padding: 30px 15px;
-    opacity: 0.7;
-}
-
-.noise-item {
-    background: transparent;
-    padding: 10px;
-    margin-bottom: 10px;
-    border: 1px solid rgba(0, 255, 0, 0.3);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    animation: fadeIn 0.3s ease-out;
-}
-
-.noise-item-info {
-    flex: 1;
-}
-
-.noise-item-name {
-    color: var(--accent-color);
-    font-size: 0.8rem;
-    margin-bottom: 2px;
-}
-
-.noise-item-time {
-    color: var(--text-secondary);
-    font-size: 0.7rem;
-    opacity: 0.6;
-}
-
-.noise-item-controls {
-    display: flex;
-    gap: 5px;
-}
-
-.noise-item-controls .btn {
-    padding: 5px 10px;
-    font-size: 0.75rem;
 }
 
 /* Draw Section */
@@ -678,8 +607,7 @@ h1 {
         flex: 1;
     }
     
-    .chat-messages,
-    .noise-list {
+    .chat-messages {
         max-height: 250px;
     }
     

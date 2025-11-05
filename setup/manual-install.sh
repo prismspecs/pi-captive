@@ -349,7 +349,6 @@ echo "EXPLANATION: The backend server enables real-time communication between de
 echo "             Features:"
 echo "               - Shared chat messages across all devices"
 echo "               - Collaborative drawing canvas"
-echo "               - Shared audio recordings"
 echo "             Technology: Node.js + Socket.io (WebSockets)"
 echo ""
 

@@ -1,6 +1,6 @@
 /**
  * Captive Portal - Retro Hacking Interface
- * Features: Real-time Chat, Noise Recording, Shared Drawing Canvas
+ * Features: Real-time Chat, Shared Drawing Canvas
  * Backend: Socket.io for shared state across all connected devices
  */
 
@@ -8,9 +8,6 @@
 const state = {
     connectionTime: new Date(),
     particleCount: 15,
-    recording: false,
-    mediaRecorder: null,
-    audioChunks: [],
     drawing: false,
     canvas: null,
     ctx: null,
@@ -32,7 +29,6 @@ function init() {
     createParticles();
     setupTabs();
     setupChat();
-    setupNoise();
     setupCanvas();
     connectToBackend();
     
@@ -65,7 +61,6 @@ function connectToBackend() {
     state.socket.on('init', (data) => {
         console.log('[SOCKET] Received initial state:', data);
         renderAllChatMessages(data.messages || []);
-        renderNoise(data.sounds || []);
         if (data.canvasData) {
             loadCanvasData(data.canvasData);
         }
@@ -74,11 +69,6 @@ function connectToBackend() {
     // Real-time chat messages
     state.socket.on('chat:message', (message) => {
         appendChatMessage(message);
-    });
-    
-    // Real-time noise updates
-    state.socket.on('noise:add', (sound) => {
-        appendNoiseItem(sound);
     });
     
     // Real-time canvas updates
@@ -250,145 +240,6 @@ function createChatMessageElement(message) {
     `;
     
     return div;
-}
-
-/**
- * NOISE RECORDING SYSTEM
- */
-function setupNoise() {
-    const recordBtn = document.getElementById('recordBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    
-    if (recordBtn) recordBtn.addEventListener('click', startRecording);
-    if (stopBtn) stopBtn.addEventListener('click', stopRecording);
-}
-
-async function startRecording() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        state.mediaRecorder = new MediaRecorder(stream);
-        state.audioChunks = [];
-        
-        state.mediaRecorder.addEventListener('dataavailable', (e) => {
-            state.audioChunks.push(e.data);
-        });
-        
-        state.mediaRecorder.addEventListener('stop', saveRecording);
-        
-        state.mediaRecorder.start();
-        state.recording = true;
-        
-        document.getElementById('recordBtn').disabled = true;
-        document.getElementById('stopBtn').disabled = false;
-        document.getElementById('recordingStatus').textContent = 'recording...';
-    } catch (e) {
-        console.error('Error starting recording:', e);
-        showNotification('microphone access denied');
-    }
-}
-
-function stopRecording() {
-    if (state.mediaRecorder && state.recording) {
-        state.mediaRecorder.stop();
-        state.recording = false;
-        
-        state.mediaRecorder.stream.getTracks().forEach(track => track.stop());
-        
-        document.getElementById('recordBtn').disabled = false;
-        document.getElementById('stopBtn').disabled = true;
-        document.getElementById('recordingStatus').textContent = '';
-    }
-}
-
-function saveRecording() {
-    if (!state.connected) {
-        showNotification('not connected to server');
-        return;
-    }
-    
-    const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
-    const reader = new FileReader();
-    
-    reader.onloadend = () => {
-        const base64 = reader.result;
-        
-        // Check size (limit to 1MB)
-        if (base64.length > 1000000) {
-            showNotification('recording too large');
-            return;
-        }
-        
-        const sound = {
-            id: Date.now(),
-            name: 'anonymous',
-            data: base64,
-            timestamp: new Date().toISOString()
-        };
-        
-        // Send to backend
-        state.socket.emit('noise:add', sound);
-        showNotification('sound saved');
-    };
-    
-    reader.readAsDataURL(blob);
-}
-
-function renderNoise(sounds) {
-    const container = document.getElementById('noiseList');
-    if (!container) return;
-    
-    if (sounds.length === 0) {
-        container.innerHTML = '<div class="noise-placeholder">No sounds yet. Record something!</div>';
-        return;
-    }
-    
-    container.innerHTML = '';
-    sounds.forEach(sound => {
-        const el = createNoiseElement(sound);
-        container.appendChild(el);
-    });
-}
-
-function appendNoiseItem(sound) {
-    const container = document.getElementById('noiseList');
-    if (!container) return;
-    
-    const placeholder = container.querySelector('.noise-placeholder');
-    if (placeholder) placeholder.remove();
-    
-    const el = createNoiseElement(sound);
-    container.appendChild(el);
-}
-
-function createNoiseElement(sound) {
-    const div = document.createElement('div');
-    div.className = 'noise-item';
-    
-    const time = new Date(sound.timestamp);
-    const timeStr = time.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-    });
-    
-    div.innerHTML = `
-        <div class="noise-item-info">
-            <div class="noise-item-name">${escapeHtml(sound.name)}</div>
-            <div class="noise-item-time">${timeStr}</div>
-        </div>
-        <div class="noise-item-controls">
-            <button class="btn play-btn" data-id="${sound.id}">▶ play</button>
-        </div>
-    `;
-    
-    const playBtn = div.querySelector('.play-btn');
-    playBtn.addEventListener('click', () => playSound(sound));
-    
-    return div;
-}
-
-function playSound(sound) {
-    const audio = new Audio(sound.data);
-    audio.play().catch(e => console.error('Error playing sound:', e));
 }
 
 /**

@@ -20,7 +20,6 @@ const io = socketIo(server, {
 // In-memory storage
 const state = {
     messages: [],
-    sounds: [],
     canvasData: null
 };
 
@@ -30,10 +29,6 @@ app.use(express.json({ limit: '10mb' }));
 // API endpoints
 app.get('/api/messages', (req, res) => {
     res.json(state.messages.slice(-50)); // Last 50 messages
-});
-
-app.get('/api/sounds', (req, res) => {
-    res.json(state.sounds.slice(-20)); // Last 20 sounds
 });
 
 app.get('/api/canvas', (req, res) => {
@@ -47,7 +42,6 @@ io.on('connection', (socket) => {
     // Send current state to new client
     socket.emit('init', {
         messages: state.messages.slice(-50),
-        sounds: state.sounds.slice(-20),
         canvasData: state.canvasData
     });
     
@@ -63,20 +57,6 @@ io.on('connection', (socket) => {
         
         // Broadcast to all clients
         io.emit('chat:message', message);
-    });
-    
-    // Noise/sound recording
-    socket.on('noise:add', (sound) => {
-        console.log(`[NOISE] New recording from ${sound.name}`);
-        state.sounds.push(sound);
-        
-        // Keep last 30 sounds
-        if (state.sounds.length > 30) {
-            state.sounds = state.sounds.slice(-30);
-        }
-        
-        // Broadcast to all clients
-        io.emit('noise:add', sound);
     });
     
     // Canvas drawing
@@ -104,7 +84,6 @@ app.get('/health', (req, res) => {
         status: 'ok',
         clients: io.engine.clientsCount,
         messages: state.messages.length,
-        sounds: state.sounds.length,
         hasCanvas: !!state.canvasData
     });
 });
@@ -122,7 +101,6 @@ server.listen(PORT, '0.0.0.0', () => {
 
 Features:
   • Real-time chat
-  • Shared audio recordings
   • Collaborative drawing canvas
 
 Press Ctrl+C to stop

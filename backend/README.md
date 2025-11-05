@@ -7,7 +7,6 @@ Real-time backend server for shared state across all connected devices.
 This Node.js server enables **true multi-device interaction** on the captive portal:
 
 - **Real-time Chat**: Messages appear instantly on all connected devices
-- **Shared Audio**: Record sounds that everyone can hear
 - **Collaborative Canvas**: Draw together on a shared canvas
 
 ## Architecture
@@ -38,21 +37,18 @@ Device 3 ─────┘
 ### HTTP (REST)
 - `GET /health` - Server status and stats
 - `GET /api/messages` - Get last 50 chat messages
-- `GET /api/sounds` - Get last 20 audio recordings
 - `GET /api/canvas` - Get current canvas state
 
 ### WebSocket (Socket.io)
 
 **Client → Server:**
 - `chat:message` - Send a chat message
-- `noise:add` - Upload audio recording
 - `canvas:update` - Broadcast canvas changes
 - `canvas:clear` - Clear the canvas
 
 **Server → Client:**
 - `init` - Initial state on connection
 - `chat:message` - New message broadcast
-- `noise:add` - New sound broadcast
 - `canvas:update` - Canvas update broadcast
 - `canvas:clear` - Canvas cleared broadcast
 
@@ -92,7 +88,6 @@ npm start
 ## Storage Limits
 
 - **Chat**: Last 100 messages
-- **Sounds**: Last 30 recordings (max 1MB each)
 - **Canvas**: Single shared canvas state
 
 Data is stored in RAM and will be lost on server restart.
@@ -101,7 +96,6 @@ Data is stored in RAM and will be lost on server restart.
 
 - No authentication required
 - Anyone on the WiFi can post content
-- Audio recordings are base64-encoded and stored in memory
 - No persistent database (intentional for privacy)
 
 ## Port

@@ -81,7 +81,7 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 echo ""
-echo "[1/7] Updating system packages..."
+echo "[1/9] Updating system packages..."
 echo "-----------------------------------"
 echo "EXPLANATION: We update package lists and upgrade existing packages to ensure"
 echo "             we have the latest security patches and compatibility fixes."
@@ -92,7 +92,7 @@ echo ""
 echo "System update complete."
 
 echo ""
-echo "[2/7] Installing required packages..."
+echo "[2/9] Installing required packages..."
 echo "--------------------------------------"
 echo "EXPLANATION: Installing four core components:"
 echo "  - hostapd: Turns the WiFi adapter into an access point"
@@ -105,7 +105,7 @@ echo ""
 echo "All packages installed successfully."
 
 echo ""
-echo "[3/7] Configuring network interface..."
+echo "[3/9] Configuring network interface..."
 echo "---------------------------------------"
 echo "EXPLANATION: The wireless interface (wlan0) needs a static IP address because"
 echo "             it will act as the gateway for connected clients. We also prevent"
@@ -201,7 +201,7 @@ systemctl disable wpa_supplicant 2>/dev/null || true
 echo "Network interface configured with static IP."
 
 echo ""
-echo "[4/7] Configuring hostapd (WiFi Access Point)..."
+echo "[4/9] Configuring hostapd (WiFi Access Point)..."
 echo "-------------------------------------------------"
 echo "EXPLANATION: hostapd configures the WiFi radio to broadcast as an access point."
 echo "             It handles:"
@@ -251,7 +251,7 @@ echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' > /etc/default/hostapd
 echo "hostapd configured successfully."
 
 echo ""
-echo "[5/7] Configuring dnsmasq (DNS and DHCP)..."
+echo "[5/9] Configuring dnsmasq (DNS and DHCP)..."
 echo "--------------------------------------------"
 echo "EXPLANATION: dnsmasq provides two critical services:"
 echo ""
@@ -287,7 +287,7 @@ sed -i "s/PORTAL_IP_PLACEHOLDER/$PORTAL_IP/g" /etc/dnsmasq.conf
 echo "dnsmasq configured successfully."
 
 echo ""
-echo "[6/7] Configuring nginx (Web Server)..."
+echo "[6/9] Configuring nginx (Web Server)..."
 echo "----------------------------------------"
 echo "EXPLANATION: nginx serves the captive portal webpage."
 echo "             Key configuration points:"
@@ -308,7 +308,7 @@ chown -R www-data:www-data /var/www/html
 echo "Webapp deployed successfully."
 
 echo ""
-echo "[7/7] Configuring iptables (Firewall Rules)..."
+echo "[7/9] Configuring iptables (Firewall Rules)..."
 echo "-----------------------------------------------"
 echo "EXPLANATION: iptables redirects all HTTP and HTTPS traffic to our portal."
 echo "             This ensures clients cannot bypass the portal by:"
@@ -343,7 +343,50 @@ netfilter-persistent save
 echo "Firewall rules configured and saved."
 
 echo ""
-echo "Enabling and starting services..."
+echo "[8/9] Installing Backend Server (Node.js)..."
+echo "----------------------------------------------"
+echo "EXPLANATION: The backend server enables real-time communication between devices."
+echo "             Features:"
+echo "               - Shared chat messages across all devices"
+echo "               - Collaborative drawing canvas"
+echo "               - Shared audio recordings"
+echo "             Technology: Node.js + Socket.io (WebSockets)"
+echo ""
+
+# Install Node.js if not present
+if ! command -v node &> /dev/null; then
+    echo "Installing Node.js 20..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+    echo "Node.js installed: $(node --version)"
+else
+    echo "Node.js already installed: $(node --version)"
+fi
+
+# Create backend directory
+echo "Setting up backend directory..."
+mkdir -p /opt/captive-portal/backend
+cp ../backend/server.js /opt/captive-portal/backend/
+cp ../backend/package.json /opt/captive-portal/backend/
+
+# Install dependencies
+echo "Installing Node.js dependencies..."
+cd /opt/captive-portal/backend
+npm install --production --quiet
+
+# Set permissions
+chown -R www-data:www-data /opt/captive-portal
+
+# Install systemd service
+echo "Installing backend systemd service..."
+cd - > /dev/null
+cp ../backend/captive-backend.service /etc/systemd/system/
+systemctl daemon-reload
+
+echo "Backend installed successfully."
+
+echo ""
+echo "[9/9] Enabling and starting services..."
 echo "----------------------------------"
 echo "EXPLANATION: We enable services to start automatically on boot, then start them now."
 echo "             Start order matters: hostapd first (creates network), then dnsmasq (serves it)."
@@ -356,6 +399,7 @@ systemctl unmask hostapd
 systemctl enable hostapd
 systemctl enable dnsmasq
 systemctl enable nginx
+systemctl enable captive-backend
 
 echo "Starting services in correct order..."
 # Start services
@@ -365,6 +409,8 @@ sleep 2  # Give hostapd time to initialize the interface
 systemctl start dnsmasq
 sleep 1
 systemctl start nginx
+sleep 1
+systemctl start captive-backend
 
 echo ""
 echo "Verifying service status..."
@@ -384,6 +430,12 @@ if systemctl is-active --quiet nginx; then
     echo "  [OK] nginx is running"
 else
     echo "  [FAIL] nginx failed to start"
+fi
+
+if systemctl is-active --quiet captive-backend; then
+    echo "  [OK] captive-backend is running"
+else
+    echo "  [FAIL] captive-backend failed to start"
 fi
 
 echo ""
@@ -407,18 +459,15 @@ echo "Services Running:"
 echo "  - hostapd (WiFi Access Point)"
 echo "  - dnsmasq (DNS + DHCP Server)"
 echo "  - nginx (Web Server)"
+echo "  - captive-backend (Real-time Backend)"
 echo "  - iptables (Firewall Rules)"
 echo ""
 echo "NEXT STEPS:"
 echo "-----------"
-echo "1. INSTALL THE BACKEND (for real-time chat, drawing, noise sharing):"
-echo "   cd .. && sudo bash setup-backend.sh"
-echo "   (This enables shared state between all connected devices)"
-echo ""
-echo "2. REBOOT the Raspberry Pi to ensure all changes take effect:"
+echo "1. REBOOT the Raspberry Pi to ensure all changes take effect:"
 echo "   sudo reboot"
 echo ""
-echo "3. CONNECT a test device:"
+echo "2. CONNECT a test device:"
 echo "   - Scan for WiFi network: $SSID"
 if [ -z "$PASSWORD" ]; then
     echo "   - Connect directly (no password required)"
@@ -427,7 +476,7 @@ else
 fi
 echo "   - Wait for captive portal popup (should appear automatically)"
 echo ""
-echo "4. TEST the portal:"
+echo "3. TEST the portal:"
 echo "   - If no popup appears, open a browser and visit any HTTP website"
 echo "   - You should be redirected to the captive portal page"
 echo "   - Try visiting different domains to verify DNS redirection"
